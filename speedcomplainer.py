@@ -21,14 +21,19 @@ def main(filename, argv):
     global shutdownFlag
     signal.signal(signal.SIGINT, shutdownHandler)
 
-    monitor = Monitor()
+    config = json.load(open('./config.json'))
+    sleepTimer = config['time']['sleepTimer']
+    pingInterval = config['time']['pingInterval']
+    speedInterval = config['time']['speedInterval']
+
+    monitor = Monitor(pingInterval, speedInterval)
 
     while not shutdownFlag:
         try:
 
             monitor.run()
 
-            for i in range(0, 5):
+            for i in range(0, sleepTimer):
                 if shutdownFlag:
                     break
                 time.sleep(1)
@@ -45,16 +50,18 @@ def shutdownHandler(signo, stack_frame):
     shutdownFlag = True
 
 class Monitor():
-    def __init__(self):
+    def __init__(self, pingInterval=60, speedInterval=3600):
         self.lastPingCheck = None
         self.lastSpeedTest = None
+        self.pingInterval = pingInterval
+        self.speedInterval = speedInterval
 
     def run(self):
-        if not self.lastPingCheck or (datetime.now() - self.lastPingCheck).total_seconds() >= 60:
+        if not self.lastPingCheck or (datetime.now() - self.lastPingCheck).total_seconds() >= self.pingInterval:
             self.runPingTest()
             self.lastPingCheck = datetime.now()
 
-        if not self.lastSpeedTest or (datetime.now() - self.lastSpeedTest).total_seconds() >= 3600:
+        if not self.lastSpeedTest or (datetime.now() - self.lastSpeedTest).total_seconds() >= self.speedInterval:
             self.runSpeedTest()
             self.lastSpeedTest = datetime.now()
 
@@ -73,7 +80,7 @@ class PingTest(threading.Thread):
         self.pingTimeout = pingTimeout
         self.maxWaitTime = maxWaitTime
         self.config = json.load(open('./config.json'))
-        self.logger = Logger(self.config['log']['type'], { 'filename': self.config['log']['files']['ping'] })
+        self.logger = Logger(self.config['log']['type'], { 'filename': self.config['log']['files']['ping'], 'style': 'ping' })
 
     def run(self):
         pingResults = self.doPingTest()
@@ -87,18 +94,19 @@ class PingTest(threading.Thread):
         return { 'date': datetime.now(), 'success': success }
 
     def logPingResults(self, pingResults):
-        self.logger.log([ pingResults['date'].strftime('%Y-%m-%d %H:%M:%S'), str(pingResults['success'])])
+        row = {'date': pingResults['date'].strftime('%Y-%m-%d %H:%M:%S'), 'success': str(pingResults['success'])}
+        self.logger.log(row)
 
 class SpeedTest(threading.Thread):
     def __init__(self):
         super(SpeedTest, self).__init__()
         self.config = json.load(open('./config.json'))
-        self.logger = Logger(self.config['log']['type'], { 'filename': self.config['log']['files']['speed'] })
+        self.logger = Logger(self.config['log']['type'], { 'filename': self.config['log']['files']['speed'], 'style': 'speed' })
 
     def run(self):
         speedTestResults = self.doSpeedTest()
         self.logSpeedTestResults(speedTestResults)
-        self.tweetResults(speedTestResults)
+        #self.tweetResults(speedTestResults)
 
     def doSpeedTest(self):
         # run a speed test
@@ -123,8 +131,8 @@ class SpeedTest(threading.Thread):
         return { 'date': datetime.now(), 'uploadResult': uploadResult, 'downloadResult': downloadResult, 'ping': pingResult }
 
     def logSpeedTestResults(self, speedTestResults):
-        self.logger.log([ speedTestResults['date'].strftime('%Y-%m-%d %H:%M:%S'), str(speedTestResults['uploadResult']), str(speedTestResults['downloadResult']), str(speedTestResults['ping']) ])
-
+        row = {'date': speedTestResults['date'].strftime('%Y-%m-%d %H:%M:%S'), 'upload': speedTestResults['uploadResult'], 'download': speedTestResults['downloadResult']}
+        self.logger.log(row)
 
     def tweetResults(self, speedTestResults):
         thresholdMessages = self.config['tweetThresholds']
