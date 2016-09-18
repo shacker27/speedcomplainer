@@ -21,15 +21,15 @@
         ]
     },
     "time" : {
-        "pingInterval": 30,
-        "speedInterval": 60,
-        "sleepTimer": 10
+        "pingInterval": 900,
+        "speedInterval": 1800,
+        "sleepTimer": 30
     },
     "log": {
-        "type": "csv",
+        "type": "sqlite",
         "files": {
-            "ping": "pingresults.csv",
-            "speed": "speedresults.csv"
+            "ping": "pingresults.db",
+            "speed": "speedresults.db"
         }
     }
 }

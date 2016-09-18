@@ -11,6 +11,7 @@ import random
 from logger import Logger
 
 shutdownFlag = False
+runNowFlag = False
 
 def main(filename, argv):
     print "======================================"
@@ -20,6 +21,7 @@ def main(filename, argv):
 
     global shutdownFlag
     signal.signal(signal.SIGINT, shutdownHandler)
+    signal.signal(signal.SIGUSR1, customHandler)
 
     config = json.load(open('./config.json'))
     sleepTimer = config['time']['sleepTimer']
@@ -44,6 +46,10 @@ def main(filename, argv):
 
     sys.exit()
 
+def customHandler(signo, stack_frame):
+    global runNowFlag
+    runNowFlag = True
+
 def shutdownHandler(signo, stack_frame):
     global shutdownFlag
     print 'Got shutdown signal (%s: %s).' % (signo, stack_frame)
@@ -57,13 +63,18 @@ class Monitor():
         self.speedInterval = speedInterval
 
     def run(self):
-        if not self.lastPingCheck or (datetime.now() - self.lastPingCheck).total_seconds() >= self.pingInterval:
+        global runNowFlag
+        if runNowFlag or not self.lastPingCheck or (datetime.now() - self.lastPingCheck).total_seconds() >= self.pingInterval:
             self.runPingTest()
-            self.lastPingCheck = datetime.now()
+            if not runNowFlag:
+                self.lastPingCheck = datetime.now()
 
-        if not self.lastSpeedTest or (datetime.now() - self.lastSpeedTest).total_seconds() >= self.speedInterval:
+        if runNowFlag or not self.lastSpeedTest or (datetime.now() - self.lastSpeedTest).total_seconds() >= self.speedInterval:
             self.runSpeedTest()
-            self.lastSpeedTest = datetime.now()
+            if not runNowFlag:
+                self.lastSpeedTest = datetime.now()
+        if runNowFlag:
+            runNowFlag = False
 
     def runPingTest(self):
         pingThread = PingTest()
